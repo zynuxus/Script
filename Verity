@@ -1,1 +1,229 @@
-local Fluent=loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/ma in.lua"))() local Window=Fluent:CreateWindow({Title="Zynuxus",SubTitle="Fluent "..Fluent.Version,TabWidth=160,Size=UDim2.fromOffset(580,460),Acrylic=true,Theme="Dark",MinimizeKey=Enum.KeyCode.LeftControl}) local Tabs={Ma in=Window:AddTab({Title="Ma in",Icon="hammer"})}local Options=Fluent.Options local function GetNil(Name,DebugId) for _,Object in getnilinstances() do if Object.Name==Name and Object:GetDebugId()==DebugId then return Object end end end local Event=game:GetService("ReplicatedStorage").Remotes.BreakBlock local CraftEvent=game:GetService("ReplicatedStorage").Remotes.CraftBlock local DECORATIVE_PARENT_KEYWORDS={"shop","spawn","lobby","deco","display","preview","menu","ui"}local function IsRealBlock(Part) if not Part:IsA("BasePart") then return false end if Part.Transparency>=0.9 then return false end if Part.Size.Magnitude<1 then return false end local Parent=Part.Parent if Parent and not Parent:IsA("Workspace") then local ParentName=Parent.Name:lower() for _,Keyword in ipairs(DECORATIVE_PARENT_KEYWORDS) do if ParentName:find(Keyword,1,true) then return false end end end return true end local function GetPartsByName(Name) local Parts,Seen={},{}f or _,Object in ipairs(game:GetDescendants()) do if Object:IsA("Part") and Object.Name==Name and IsRealBlock(Object) and not Seen[Object] then Parts[#Parts+1]=Object Seen[Object]=true end end f or _,Object in getnilinstances() do if Object:IsA("Part") and Object.Name==Name and IsRealBlock(Object) and not Seen[Object] then Parts[#Parts+1]=Object end end return Parts end local function GetLogParts() local Parts,Seen={},{}f or _,Object in ipairs(game:GetDescendants()) do if Object:IsA("Part") and Object.Name:sub(-3)=="Log" and IsRealBlock(Object) and not Seen[Object] then Parts[#Parts+1]=Object Seen[Object]=true end end f or _,Object in getnilinstances() do if Object:IsA("Part") and Object.Name:sub(-3)=="Log" and IsRealBlock(Object) and not Seen[Object] then Parts[#Parts+1]=Object end end return Parts end local function FireParts(PartList) local Count=0 f or Index,Part in ipairs(PartList) do local Target=GetNil(Part.Name,Part:GetDebugId()) or Part Event:FireServer(Target)Count=Count+1 if Index%50==0 then task.wait() end end return Count end local function GetPlankNames() local Names={}local function Collect(List) for _,Object in ipairs(List) do if Object:IsA("Part") and Object.Name:sub(-3)=="Log" and IsRealBlock(Object) then Names[Object.Name]=true end end end Collect(game:GetDescendants())Collect(getnilinstances()) local Planks={}f or Name in pairs(Names) do Planks[#Planks+1]=Name:sub(1,-4).."Plank" end if #Planks==0 then Planks={"WoodPlank"}end return Planks end local function CraftItems(ItemNames,Count) for i=1,Count do f or _,Item in ipairs(ItemNames) do if Fluent.Unloaded then return end CraftEvent:FireServer(Item) end if i%50==0 then task.wait() end end end Tabs.Ma in:AddToggle("BreakLog",{Title="Break Log(Auto)",Description="Fires BreakBlock at every real Log in every biome every 2s until none left",Default=false,Callback=function (Value) if Value then task.spawn(function () while Options.BreakLog.Value and not Fluent.Unloaded do local LogParts=GetLogParts() if #LogParts==0 then print("[Zynuxus]All Logs broken — none left")Fluent:Notify({Title="Break Log",Content="No Logs left — stopped",Duration=5})Options.BreakLog:SetValue(false) break end FireParts(LogParts)print("[Zynuxus]Fired at "..#LogParts.." logs,waiting 2s...")task.wait(2) end end ) else print("[Zynuxus]Break Log stopped") end end })Tabs.Ma in:AddButton({Title="Break Cobblestone",Description="Fires BreakBlock at every real Part named Cobblestone(press anytime)",Callback=function () local Parts=GetPartsByName("Cobblestone") local Count=FireParts(Parts) if Count>0 then print("[Zynuxus]Broken "..Count.." cobblestone")Fluent:Notify({Title="Cobblestone",Content="Broken "..Count.." cobblestone",Duration=3}) else print("[Zynuxus]No Part named Cobblestone found")Fluent:Notify({Title="Cobblestone",Content="No Part named Cobblestone found",Duration=3}) end end })Tabs.Ma in:AddToggle("CraftWood",{Title="Craft Wood(All Biomes)",Description="Crafts every biome's wood plank 2000x per cycle,repeating every 2s while on",Default=false,Callback=function (Value) if Value then task.spawn(function () while Options.CraftWood.Value and not Fluent.Unloaded do local Planks=GetPlankNames()print("[Zynuxus]Crafting: "..table.concat(Planks,","))CraftItems(Planks,2000) if Fluent.Unloaded then break end task.wait(2) end print("[Zynuxus]Crafting stopped") end ) else print("[Zynuxus]Crafting stopped by user") end end })Window:SelectTab(1)Fluent:Notify({Title="Zynuxus",Content="Loaded — toggles are on the Ma in tab",Duration=5})
+-- ============================================
+-- Zynuxus (English)
+-- ============================================
+
+-- Load Fluent UI
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Zynuxus",
+    SubTitle = "Fluent " .. Fluent.Version,
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true, -- Set to false if the game detects the blur
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = "Main", Icon = "hammer" })
+}
+local Options = Fluent.Options
+
+-- Cobalt generated code
+local function GetNil(Name, DebugId)
+	for _, Object in getnilinstances() do
+		if Object.Name == Name and Object:GetDebugId() == DebugId then
+			return Object
+		end
+	end
+end
+
+local Event = game:GetService("ReplicatedStorage").Remotes.BreakBlock
+local CraftEvent = game:GetService("ReplicatedStorage").Remotes.CraftBlock
+
+-- ============================================
+-- FIX: filter out "fake" blocks that can't be broken
+-- ============================================
+-- Fake logs are usually:
+--   * decorative copies (shop displays, spawn/lobby props, previews)
+--   * respawn "ghosts" (invisible placeholder left while the block reloads)
+--   * tiny / zero-size placeholder parts
+-- BreakBlock does nothing on them, so we skip them before firing.
+-- If the game's fake logs still slip through, check what's different about
+-- them (parent name, transparency, size, color) and tighten IsRealBlock.
+local DECORATIVE_PARENT_KEYWORDS = { "shop", "spawn", "lobby", "deco", "display", "preview", "menu", "ui" }
+
+local function IsRealBlock(Part)
+    if not Part:IsA("BasePart") then return false end
+    -- Invisible block = not actually there (broken / respawning / hidden)
+    if Part.Transparency >= 0.9 then return false end
+    -- Zero or tiny size = placeholder part
+    if Part.Size.Magnitude < 1 then return false end
+    -- Decorations usually live under shop / spawn / lobby / display containers
+    local Parent = Part.Parent
+    if Parent and not Parent:IsA("Workspace") then
+        local ParentName = Parent.Name:lower()
+        for _, Keyword in ipairs(DECORATIVE_PARENT_KEYWORDS) do
+            if ParentName:find(Keyword, 1, true) then
+                return false
+            end
+        end
+    end
+    return true
+end
+
+-- Find Parts by exact name (in game + nil instances), skipping fake ones
+local function GetPartsByName(Name)
+    local Parts, Seen = {}, {}
+    for _, Object in ipairs(game:GetDescendants()) do
+        if Object:IsA("Part") and Object.Name == Name and IsRealBlock(Object) and not Seen[Object] then
+            Parts[#Parts + 1] = Object
+            Seen[Object] = true
+        end
+    end
+    for _, Object in getnilinstances() do
+        if Object:IsA("Part") and Object.Name == Name and IsRealBlock(Object) and not Seen[Object] then
+            Parts[#Parts + 1] = Object
+        end
+    end
+    return Parts
+end
+
+-- Find real, breakable Parts whose name ends with "Log" (all biomes)
+local function GetLogParts()
+    local Parts, Seen = {}, {}
+    for _, Object in ipairs(game:GetDescendants()) do
+        if Object:IsA("Part") and Object.Name:sub(-3) == "Log" and IsRealBlock(Object) and not Seen[Object] then
+            Parts[#Parts + 1] = Object
+            Seen[Object] = true
+        end
+    end
+    for _, Object in getnilinstances() do
+        if Object:IsA("Part") and Object.Name:sub(-3) == "Log" and IsRealBlock(Object) and not Seen[Object] then
+            Parts[#Parts + 1] = Object
+        end
+    end
+    return Parts
+end
+
+-- Fire BreakBlock for a list of Parts (yield 1 frame every 50 to avoid lag)
+local function FireParts(PartList)
+    local Count = 0
+    for Index, Part in ipairs(PartList) do
+        -- Prefer the server-side copy (nil instance) when one matches
+        local Target = GetNil(Part.Name, Part:GetDebugId()) or Part
+        Event:FireServer(Target)
+        Count = Count + 1
+        if Index % 50 == 0 then
+            task.wait()
+        end
+    end
+    return Count
+end
+
+-- Build a plank item name for every biome from its real Log name,
+-- e.g. "ForestLog" -> "ForestPlank". Falls back to "WoodPlank".
+local function GetPlankNames()
+    local Names = {}
+    local function Collect(List)
+        for _, Object in ipairs(List) do
+            if Object:IsA("Part") and Object.Name:sub(-3) == "Log" and IsRealBlock(Object) then
+                Names[Object.Name] = true
+            end
+        end
+    end
+    Collect(game:GetDescendants())
+    Collect(getnilinstances())
+
+    local Planks = {}
+    for Name in pairs(Names) do
+        Planks[#Planks + 1] = Name:sub(1, -4) .. "Plank"
+    end
+    if #Planks == 0 then
+        Planks = { "WoodPlank" }
+    end
+    return Planks
+end
+
+-- Fire CraftBlock for each item, Count times total (lag-free)
+local function CraftItems(ItemNames, Count)
+    for i = 1, Count do
+        for _, Item in ipairs(ItemNames) do
+            if Fluent.Unloaded then return end
+            CraftEvent:FireServer(Item)
+        end
+        if i % 50 == 0 then
+            task.wait()
+        end
+    end
+end
+
+-- ===== Toggle 1: Auto Break Log =====
+Tabs.Main:AddToggle("BreakLog", {
+    Title = "Break Log (Auto)",
+    Description = "Fires BreakBlock at every real Log in every biome every 2s until none left",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            task.spawn(function()
+                while Options.BreakLog.Value and not Fluent.Unloaded do
+                    local LogParts = GetLogParts()
+
+                    if #LogParts == 0 then
+                        print("[Zynuxus] All Logs broken — none left")
+                        Fluent:Notify({ Title = "Break Log", Content = "No Logs left — stopped", Duration = 5 })
+                        Options.BreakLog:SetValue(false)
+                        break
+                    end
+
+                    FireParts(LogParts)
+                    print("[Zynuxus] Fired at " .. #LogParts .. " logs, waiting 2s...")
+
+                    task.wait(2)
+                end
+            end)
+        else
+            print("[Zynuxus] Break Log stopped")
+        end
+    end
+})
+
+-- ===== Button: Break Cobblestone =====
+Tabs.Main:AddButton({
+    Title = "Break Cobblestone",
+    Description = "Fires BreakBlock at every real Part named Cobblestone (press anytime)",
+    Callback = function()
+        local Parts = GetPartsByName("Cobblestone")
+        local Count = FireParts(Parts)
+        if Count > 0 then
+            print("[Zynuxus] Broken " .. Count .. " cobblestone")
+            Fluent:Notify({ Title = "Cobblestone", Content = "Broken " .. Count .. " cobblestone", Duration = 3 })
+        else
+            print("[Zynuxus] No Part named Cobblestone found")
+            Fluent:Notify({ Title = "Cobblestone", Content = "No Part named Cobblestone found", Duration = 3 })
+        end
+    end
+})
+
+-- ===== Toggle 2: Craft Wood (All Biomes) =====
+Tabs.Main:AddToggle("CraftWood", {
+    Title = "Craft Wood (All Biomes)",
+    Description = "Crafts every biome's wood plank 2000x per cycle, repeating every 2s while on",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            task.spawn(function()
+                while Options.CraftWood.Value and not Fluent.Unloaded do
+                    local Planks = GetPlankNames()
+                    print("[Zynuxus] Crafting: " .. table.concat(Planks, ", "))
+
+                    CraftItems(Planks, 2000)
+
+                    if Fluent.Unloaded then break end
+                    task.wait(2)
+                end
+                print("[Zynuxus] Crafting stopped")
+            end)
+        else
+            print("[Zynuxus] Crafting stopped by user")
+        end
+    end
+})
+
+Window:SelectTab(1)
+Fluent:Notify({
+    Title = "Zynuxus",
+    Content = "Loaded — toggles are on the Main tab",
+    Duration = 5
+})
